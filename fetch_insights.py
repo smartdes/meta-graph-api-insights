@@ -5,18 +5,19 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-ACCESS_TOKEN = os.getenv("META_ACCESS_TOKEN")
-PAGE_ID = os.getenv("PAGE_ID")  # Uses your specific Page ID
+def get_page_metrics(access_token=None, page_id=None, metrics=['page_impressions', 'page_post_engagements']):
+    """Fetches insights data from Meta Graph API using provided credentials or .env fallback."""
+    token = access_token or os.getenv("META_ACCESS_TOKEN")
+    p_id = page_id or os.getenv("PAGE_ID")
 
-def get_page_metrics():
-    if not ACCESS_TOKEN or not PAGE_ID:
-        print("Error: META_ACCESS_TOKEN or PAGE_ID missing from .env file.")
+    if not token or not p_id:
+        print("Error: META_ACCESS_TOKEN or PAGE_ID is missing.")
         return None
 
-    url = f"https://graph.facebook.com/v19.0/{PAGE_ID}/insights"
+    url = f"https://graph.facebook.com/v19.0/{p_id}/insights"
     params = {
-        'metric': 'page_impressions,page_post_engagements',
-        'access_token': ACCESS_TOKEN
+        'metric': ','.join(metrics),
+        'access_token': token
     }
     
     response = requests.get(url, params=params)
@@ -27,10 +28,11 @@ def get_page_metrics():
         
     return response.json()
 
-def process_data(raw_data):
+def process_data(raw_data, filename="insights_summary.csv"):
+    """Processes raw JSON response into a DataFrame and exports to CSV."""
     if not raw_data or 'data' not in raw_data:
         print("No metrics data returned.")
-        return
+        return None
     
     metrics = []
     for item in raw_data['data']:
@@ -44,8 +46,9 @@ def process_data(raw_data):
             })
             
     df = pd.DataFrame(metrics)
-    df.to_csv("insights_summary.csv", index=False)
-    print("Successfully exported insights to insights_summary.csv")
+    df.to_csv(filename, index=False)
+    print(f"Successfully exported insights to {filename}")
+    return df
 
 if __name__ == "__main__":
     data = get_page_metrics()

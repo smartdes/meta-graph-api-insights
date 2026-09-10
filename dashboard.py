@@ -2,6 +2,7 @@ import os
 import requests
 import pandas as pd
 import streamlit as st
+import datetime
 from dotenv import load_dotenv
 
 # Page Configuration
@@ -13,19 +14,66 @@ st.set_page_config(
 
 # Load environment variables
 load_dotenv()
-ACCESS_TOKEN = os.getenv("META_ACCESS_TOKEN")
-PAGE_ID = os.getenv("PAGE_ID")
 
-def fetch_meta_insights():
-    """Fetches insights data from Meta Graph API."""
-    if not ACCESS_TOKEN or not PAGE_ID:
-        st.error("Missing credentials! Ensure META_ACCESS_TOKEN and PAGE_ID are set in your .env file.")
+# ---------------------------------------------------------
+# SIDEBAR INPUT CONTROLS & AUTHENTICATION
+# ---------------------------------------------------------
+st.sidebar.title("🔑 Authentication & Setup")
+
+default_token = os.getenv("META_ACCESS_TOKEN", "")
+default_page_id = os.getenv("PAGE_ID", "")
+
+access_token = st.sidebar.text_input(
+    "Meta Access Token:", 
+    value=default_token, 
+    type="password"
+)
+
+page_id = st.sidebar.text_input(
+    "Page ID / Project ID:", 
+    value=default_page_id
+)
+
+st.sidebar.markdown("---")
+st.sidebar.title("⚙️ Dashboard Parameters")
+
+available_metrics = ['page_impressions', 'page_post_engagements']
+selected_metrics = st.sidebar.multiselect(
+    "Select Metrics to Query:",
+    options=available_metrics,
+    default=available_metrics
+)
+
+today = datetime.date.today()
+default_start = today - datetime.timedelta(days=28)
+date_range = st.sidebar.date_input(
+    "Select Date Range:",
+    value=(default_start, today)
+)
+
+min_threshold = st.sidebar.slider(
+    "Highlight metric values above:",
+    min_value=0,
+    max_value=1000,
+    value=10,
+    step=5
+)
+
+fetch_button = st.sidebar.button("🚀 Fetch Data from API", use_container_width=True)
+
+# ---------------------------------------------------------
+# FUNCTIONS
+# ---------------------------------------------------------
+def fetch_meta_insights(token, p_id, metrics):
+    """Fetches selected insights metrics from Meta Graph API."""
+    if not token or not p_id:
+        st.error("Missing credentials! Please enter your Meta Access Token and Page ID.")
         return None
 
-    url = f"https://graph.facebook.com/v19.0/{PAGE_ID}/insights"
+    url = f"https://graph.facebook.com/v19.0/{p_id}/insights"
     params = {
-        'metric': 'page_impressions,page_post_engagements',
-        'access_token': ACCESS_TOKEN
+        'metric': ','.join(metrics),
+        'access_token': token
     }
     
     try:
@@ -33,7 +81,8 @@ def fetch_meta_insights():
         if response.status_code == 200:
             return response.json()
         else:
-            st.error(f"API Error ({response.status_code}): {response.json().get('error', {}).get('message', 'Unknown error')}")
+            err_msg = response.json().get('error', {}).get('message', 'Unknown error')
+            st.error(f"API Error ({response.status_code}): {err_msg}")
             return None
     except Exception as e:
         st.error(f"Connection Error: {e}")
@@ -50,63 +99,65 @@ def process_data(raw_data):
         for val in item['values']:
             metrics.append({
                 'Metric': metric_name,
-                'Date': val['end_time'][:10],
+                'Date': pd.to_datetime(val['end_time'][:10]),
                 'Value': val['value']
             })
             
     return pd.DataFrame(metrics)
 
-# Sidebar Controls
-st.sidebar.title("⚙️ Dashboard Controls")
-st.sidebar.markdown("Fetch and visualize Meta Page insights in real-time.")
-refresh_button = st.sidebar.button("🔄 Refresh Data from Meta API")
+# ---------------------------------------------------------
+# MAIN DASHBOARD OUTPUT DISPLAY
+# ---------------------------------------------------------
+st.title("📊 Interactive Meta Insights Analytics Dashboard")
+st.markdown("Automated metrics extraction, security controls, and visual analytics pipeline for Facebook Pages.")
 
-# Main Interface
-st.title("📊 Meta Graph API Insights Dashboard")
-st.markdown("Automated metrics extraction and visual analytics pipeline for Facebook Page engagement.")
+if fetch_button:
+    if not selected_metrics:
+        st.warning("Please select at least one metric from the sidebar.")
+    else:
+        with st.spinner("Connecting to Meta Graph API..."):
+            raw_json = fetch_meta_insights(access_token, page_id, selected_metrics)
+            if raw_json:
+                st.session_state['df'] = process_data(raw_json)
 
-# Data Fetching Logic
-if refresh_button or 'insights_df' not in st.session_state:
-    with st.spinner("Querying Meta Graph API..."):
-        raw_json = fetch_meta_insights()
-        if raw_json:
-            st.session_state['insights_df'] = process_data(raw_json)
+if 'df' in st.session_state and not st.session_state['df'].empty:
+    df = st.session_state['df']
 
-# Display Dashboard Content
-if 'insights_df' in st.session_state and not st.session_state['insights_df'].empty:
-    df = st.session_state['insights_df']
+    if len(date_range) == 2:
+        start_date, end_date = date_range
+        df_filtered = df[(df['Date'].dt.date >= start_date) & (df['Date'].dt.date <= end_date)]
+    else:
+        df_filtered = df
 
-    # Metric KPI Highlights
-    st.subheader("Key Metrics Summary")
-    col1, col2 = st.columns(2)
-    
-    impressions_total = df[df['Metric'] == 'page_impressions']['Value'].sum()
-    engagements_total = df[df['Metric'] == 'page_post_engagements']['Value'].sum()
-
-    col1.metric("Total Page Impressions", f"{impressions_total:,}")
-    col2.metric("Total Post Engagements", f"{engagements_total:,}")
+    st.subheader("📌 Key Indicators Summary")
+    cols = st.columns(len(selected_metrics))
+    for idx, metric in enumerate(selected_metrics):
+        metric_sum = df_filtered[df_filtered['Metric'] == metric]['Value'].sum()
+        cols[idx].metric(label=f"Total {metric}", value=f"{metric_sum:,}")
 
     st.markdown("---")
 
-    # Data Visualization
     st.subheader("📈 Metric Trends Over Time")
-    selected_metric = st.selectbox("Select Metric to View:", df['Metric'].unique())
-    filtered_df = df[df['Metric'] == selected_metric]
-
-    st.line_chart(filtered_df.set_index('Date')['Value'])
+    active_chart_metric = st.selectbox("Display Chart For Metric:", selected_metrics)
+    chart_data = df_filtered[df_filtered['Metric'] == active_chart_metric]
+    
+    if not chart_data.empty:
+        st.line_chart(chart_data.set_index('Date')['Value'])
+    else:
+        st.info("No data available for the selected date range.")
 
     st.markdown("---")
 
-    # Raw Data Table & Download Options
-    st.subheader("📋 Raw Insights Data")
-    st.dataframe(df, use_container_width=True)
+    st.subheader("📋 Filtered Data Table")
+    threshold_df = df_filtered[df_filtered['Value'] >= min_threshold]
+    st.dataframe(threshold_df, use_container_width=True)
 
-    csv_data = df.to_csv(index=False).encode('utf-8')
+    csv_data = threshold_df.to_csv(index=False).encode('utf-8')
     st.download_button(
-        label="📥 Export Summary as CSV",
+        label="📥 Download Filtered Output CSV",
         data=csv_data,
-        file_name="meta_insights_summary.csv",
+        file_name="filtered_insights_output.csv",
         mime="text/csv"
     )
 else:
-    st.info("Click **Refresh Data from Meta API** in the sidebar to fetch initial metrics.")
+    st.info("Enter your credentials and parameters in the sidebar, then click **🚀 Fetch Data from API** to load the analytics dashboard.")
