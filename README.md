@@ -1,12 +1,34 @@
-# Meta Graph API Insights Pipeline
+# 📊 Meta Graph API Insights Exporter & Dashboard
 
-An automated data pipeline that queries social media metrics using the Meta Graph API, extracts engagement metrics, processes the payload using Python and Pandas, and generates CSV reports.
+An end-to-end Python data pipeline and interactive Web UI that authenticates with the **Meta Graph API**, extracts Facebook Page engagement metrics, processes the payload using **Pandas**, and visualizes key performance indicators via **Streamlit**.
 
-## Prerequisites
-* Python 3.10+
-* Meta for Developers Account (Page or Instagram Access Token)
+Built with a strong focus on **DevSecOps best practices** (environment variable isolation, non-versioned secrets, and structured dependency management).
 
-## Environment Variables
-Create a `.env` file in the root directory:
-```env
-META_ACCESS_TOKEN="EAAdwcelOZAVEBSSDhL3uTwvLTkjZCxVKeEQb9LIfbTzZCvJaPXFz2HL2vtYqUapdIhZBV3Eyfetr7ZBNmjcK8sSkPEwIIrXcI39ccT4QaiDJKlQxs89nRF02tbGTUT8PEqqBCQaZCevEDIcjZBMACSwvBGaLVMQb2lqi6z9twVfJZA9j2pTqVMO0aSvZA6mZBQmaTEUmhuLr3vMGrlagIQZCETle17y9xPpcdI5ezjYDg9DfZBomZAPXAaVTDpHdlAngOnpHxzj9e6ROgvsSsNxYQdZBqs"
+---
+
+## 🌟 Key Features
+
+* **Real-Time API Extraction:** Connects to Meta's Graph API (`v19.0`) to fetch Page impressions and post engagement metrics.
+* **Interactive Streamlit Dashboard:** Visualizes trends over time with dynamic line charts and summary KPI cards.
+* **Automated Data Export:** Generates custom `.csv` reports directly through the UI or CLI pipeline.
+* **Secure Credentials Handling:** Uses `python-dotenv` to ensure API tokens and Page IDs are never hardcoded or exposed in version control.
+
+---
+
+## 🛠️ Tech Stack & Prerequisites
+
+* **Language:** Python 3.x
+* **Data Processing:** Pandas
+* **API Integration:** Requests, Meta Graph API (`v19.0`)
+* **Frontend UI:** Streamlit
+* **Environment Security:** `python-dotenv`
+* **Version Control:** Git, GitHub (`.gitignore` secured)
+
+---
+
+## ⚙️ Quickstart Guide
+
+### 1. Clone the Repository
+```bash
+git clone [https://github.com/smartdes/meta-graph-api-insights.git](https://github.com/smartdes/meta-graph-api-insights.git)
+cd meta-graph-api-insights
